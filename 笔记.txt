@@ -1,0 +1,75 @@
+SecondarySort：二次排序
+    key：单词---次数
+    value：文件---次数
+    1. 单词相同的发送到同一个 reduce 进行处理
+    2. reduce 端进行排序：单词相同按照次数排序，单词不同按照单词排序
+    3. 相同的单词聚合同一组
+
+二次排序：我们有多个排序条件，先按某一列排序，再按另一列排序,...
+    思路：把所有的排序条件都放到 key 中（字符串拼接，自定义 bean）
+          自定义排序规则，一项一项的比较（WritableCompartable，SortComparator）
+          自定义 groupingcomparator 进行聚合
+
+          如果有多个 reduce 还要自定义 partitioner 进行分区
+
+
+Counter 是 mapreduce 中的计数器：用来帮我们统计 mapreduce 执行过程中的一些信息
+    默认有 35 个
+
+    自定义计数器实现记录读取的总行数：
+        1. 创建计数器 枚举 enum
+           public static enum COUNTER_WORDCOUNT2{LINES, WORDS;};
+           每一个枚举的值都表示一个计数器
+   
+        2. 让计数器自增
+           context.getCounter(COUNTER_WORDCOUNT2.LINES).increment(1L);
+
+TopN：求前几名
+    1. map 中使用 treeSet 保存数据，始终维持长度为 10
+    2. map 在 cleanup 中把 treeSet 中保存的数据输出
+    3. reduce 可能接收到多个 map 的输出，所以也要做和 map 相同的 treeSet 操作
+
+    自定义 treeSet 的排序方式
+    		private TreeSet<String> treeSet = new TreeSet<>(new Comparator<String>(){
+			@Override
+			public int compare(String o1, String o2) {
+
+				Integer n1 = Integer.parseInt(o1.split("---")[1]);
+				Integer n2 = Integer.parseInt(o2.split("---")[1]);
+
+				return n1.compareTo(n2);
+			}
+		});
+
+带分组的 TopN：先分组，然后求组内的前几名
+    就是对二次排序的结果进行截取，输出前 n 个
+
+
+连接：要以连接条件作为 key，只有连接条件才是两个文件共有的
+
+    ReduceJoin：在 reduce 端完成数据的拼接
+        1. 获取文件名字，在 map 中分开处理
+        2. value 增加唯一标识
+        3. reduce 根据唯一标识取出对应的数据，进行拼装
+
+    MapJoin：在 map 端完成数据的拼接
+        适用场景：两张表中，其中一张非常小
+                  会把小表中的数据给加载到内存中，直接在读大表的时候完成拼接
+
+        1. 把小表上传到 hdfs 设置为 mapreduce 任务的缓存文件
+               job.addCacheFile(new URI("/dep.txt"));
+
+        2. 在大表的 setup 中读取小表的所有数据并保存
+
+        3. 在大表的 map 中根据连接条件从保存的数据中取出小表对应的信息，拼接后输出
+
+    Semi Join：半连接
+		
+
+
+
+
+
+
+
+
